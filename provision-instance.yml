@@ -62,7 +62,7 @@
                     name: 
                       - parted
                       - e2fsprogs
-                      - pnupg
+                      - gnupg
                     state: present
           - name: Load aufs module
             shell: modprobe aufs
