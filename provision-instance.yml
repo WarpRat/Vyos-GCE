@@ -1,0 +1,72 @@
+---
+- name: Create vyos buildbox
+  hosts: localhost
+  gather_facts: True
+  connection: local
+
+  vars:
+    machine_type: g1-small
+    image: debian-8
+    service_account_email: vyos-ansible-builder@vyos-build.iam.gserviceaccount.com
+    credentials_file: "{{ ansible_env.HOME }}/.ssh/vyos-ansible-builder.json"
+    project_id: vyos-build
+    zone: us-west1-a
+
+  tasks:
+    - name: Launch vyos build box
+      gce:
+          instance_names: vyos-build-box
+          machine_type: "{{ machine_type }}"
+          image: "{{ image }}"
+          service_account_email: "{{ service_account_email }}"
+          credentials_file: "{{ credentials_file }}"
+          project_id: "{{ project_id }}"
+          zone: "{{ zone }}"
+          state: present
+          tags: build-server
+      register: gce
+
+    - name: Create disk for building vyos
+      gce_pd:
+          name: vyos-build-disk
+          mode: READ_WRITE
+          service_account_email: "{{ service_account_email }}"
+          credentials_file: "{{ credentials_file }}"
+          project_id: "{{ project_id }}"
+          state: present
+          instance_name: "{{ gce.instance_data[0].name }}"
+          zone: "{{ zone }}"
+          delete_on_termination: yes
+ 
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
+      loop: "{{ gce.instance_data }}"
+
+    - name: Add host to groupname
+      add_host: hostname={{ item.public_ip }} groupname=new_instances
+      loop: "{{ gce.instance_data }}"
+
+    - name: Use gcloud cli to generate keypair 
+      command: gcloud compute ssh vyos-build-box --quiet --zone "{{ zone }}" --command "whoami"
+
+- name: Manage new host
+  hosts: new_instances
+  become: yes
+  gather_facts: True
+
+  vars:
+          ansible_host_key_checking: False #CLEAN UP LATER
+          ansible_ssh_private_key_file: "{{ ansible_env.HOME }}/.ssh/google_compute_engine"
+
+  tasks:
+          - name: Install some pakages
+            apt:
+                    update_cache: yes
+                    name: 
+                      - parted
+                      - e2fsprogs
+                      - pnupg
+                    state: present
+          - name: Load aufs module
+            shell: modprobe aufs
