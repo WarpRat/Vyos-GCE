@@ -55,6 +55,24 @@
   become: yes
   gather_facts: True
 
+  vars:
+      vyos_iso_url: "{{ iso }}"
+      vyos_iso_local: /tmp/vyos.iso
+      vyos_key_url: http://packages.vyos.net/vyos-release.gpg
+      vyos_key_local: /tmp/vyos-release.gpg
+
+      CD_ROOT: /mnt/cdrom
+      CD_SQUASH_ROOT: /mnt/cdsquash
+      SQUASHFS_IMAGE: "{{ CD_ROOT }}/live/filesystem.squashfs"
+
+      ROOT_FSTYPE: ext4
+      ROOT_PARTITION: "{{ volume_drie}}1"
+
+      WRITE_ROOT: /mnt/wroot
+      READ_ROOT: /mnt/squashfs
+      INSTALL_ROOT: /mnt/inst_root
+
+
   tasks:
           - name: Install some pakages
             apt:
@@ -66,3 +84,38 @@
                     state: present
           - name: Load aufs module
             shell: modprobe aufs
+
+          - name: Download Vyos ISO release
+            get_url:
+                  url: "{{ vyos_iso_url }}"
+                  dest: "{{ vyos_iso_local }}"
+
+          - name: Mount ISO
+            mount:
+                    name: "{{ CD_ROOT }}"
+                    src: "{{ vyos_iso_local }}"
+                    fstype: iso9660
+                    opts: loop,ro
+                    state: mounted
+
+          - name: Verify checksums of all the fiels in the ISO image
+            command: md5sum -c md5sum.txt
+            args:
+              chdir: "{{ CD_ROOT }}"
+            changed_when: False
+
+          - name: Mount squashfs image from ISO
+            mount:
+              name: "{{ CD_SQUASH_ROOT }}"
+              src: "{{ SQUASHFS_IMAGE }}"
+              fstype: squashfs
+              opts: loop,ro
+              state: mounted
+
+          - name: Read version string from iso packages
+            shell: cat {{ CD_SQUASH_ROOT }}/opt/vyatta/etc/version | awk '{print $2}' | tr + -
+            register: version_string
+
+          - name: Debug version string as read from ISO
+            debug: msg="This is version {{ version_string.stdout }}"
+
