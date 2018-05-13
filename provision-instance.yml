@@ -7,8 +7,8 @@
   vars:
     machine_type: g1-small
     image: debian-8
-    service_account_email: vyos-ansible-builder@vyos-build.iam.gserviceaccount.com
-    credentials_file: "{{ ansible_env.HOME }}/.ssh/vyos-ansible-builder.json"
+    service_account_email:
+    credentials_file:
     project_id: vyos-build
     zone: us-west1-a
 
@@ -201,11 +201,12 @@
               mode: 0755
 
           - name: Copy the gcloud linux packages
-            template:
-              src: "/{{item}}"
+            copy:
+              src: "{{item}}"
               dest: "{{ INSTALL_ROOT }}/tmp/"
               mode: 0755
-            with_items: "{{ pkg_list }}"
+            with_fileglob: "*.deb"
+            register: deb_name
      
           ## ---- Install GRUB boot loader ----
           - name: Create GRUB directory
@@ -232,8 +233,7 @@
               creates: "{{ INSTALL_ROOT }}/boot/grub/grubenv"
 
           - name: Install gcloud packages
-            command: chroot {{ INSTALL_ROOT }} aptitude install /tmp{{item}}
-            with_items: "{{ pkg_list }}"
+            shell: chroot {{ INSTALL_ROOT }} dpkg -i "/tmp/*.deb"
 
           - name: Configure GRUB for GCE
             template:
