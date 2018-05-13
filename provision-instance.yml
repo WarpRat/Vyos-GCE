@@ -37,7 +37,10 @@
           instance_name: "{{ gce.instance_data[0].name }}"
           zone: "{{ zone }}"
           delete_on_termination: yes
- 
+
+    - name: Download google linux guest packages
+      shell: aptitude download "{{item}}"
+      with_items: "{{ pkg_list }}"
 
     - name: Wait for SSH to come up
       wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
@@ -191,12 +194,19 @@
               path: "{{ INSTALL_ROOT }}/opt/vyatta/etc/config/.vyatta_config"
               state: touch
       
-          - name: Copy the default config for EC2 to the installed image
+          - name: Copy the default config for GCE to the installed image
             template:
               src: templates/config.boot.default.ec2
               dest: "{{ INSTALL_ROOT }}/opt/vyatta/etc/config/config.boot"
               mode: 0755
-      
+
+          - name: Copy the gcloud linux packages
+            template:
+              src: "/{{item}}"
+              dest: "{{ INSTALL_ROOT }}/tmp/"
+              mode: 0755
+            with_items: "{{ pkg_list }}"
+     
           ## ---- Install GRUB boot loader ----
           - name: Create GRUB directory
             file:
@@ -220,8 +230,12 @@
             command: chroot {{ INSTALL_ROOT }} grub-install --no-floppy --root-directory=/boot {{ volume_drive }}
             args:
               creates: "{{ INSTALL_ROOT }}/boot/grub/grubenv"
-      
-          - name: Configure GRUB for AWS EC2
+
+          - name: Install gcloud packages
+            command: chroot {{ INSTALL_ROOT }} aptitude install /tmp{{item}}
+            with_items: "{{ pkg_list }}"
+
+          - name: Configure GRUB for GCE
             template:
               src: templates/boot/grub/grub.cfg.j2
               dest: "{{ WRITE_ROOT }}/boot/grub/grub.cfg"

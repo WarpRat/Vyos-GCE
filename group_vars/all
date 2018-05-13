@@ -3,3 +3,4 @@ ansible_ssh_common_args: -o UserKnownHostsFile=/dev/null -o StrictHostKeyCheckin
 iso: 'https://downloads.vyos.io/rolling/current/amd64/vyos-1.2.0-rolling%2B201805110337-amd64.iso'
 volume_size: 10
 volume_drive: /dev/sdb
+pkg_list: [google-compute-engine, google-compute-engine-oslogin, python3-google-compute-engine, python-google-compute-engine, google-cloud-packages-archive-keyring]
